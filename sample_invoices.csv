@@ -1,0 +1,5 @@
+invoice_id,customer,currency,amount
+INV-001,Example Bakery,USD,0.10
+INV-002,Example Bakery,USD,0.20
+CR-003,Example Bakery,USD,-0.05
+INV-004,Example Studio,EUR,8.40
