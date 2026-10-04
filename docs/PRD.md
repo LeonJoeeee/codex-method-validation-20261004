@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Help an accounts team replace weekly manual invoice addition with an offline CSV totals report. All repository invoices and customers are synthetic. The program runs from its checkout; no release or distribution form is defined.
+Help an accounts team replace weekly manual invoice addition with an offline CSV totals report and reusable multi-file aggregation. All repository invoices and customers are synthetic. The program runs from its checkout; no release or distribution form is defined.
 
 ## Reporting contract
 
@@ -18,6 +18,14 @@ Validate all input and prepare the complete report before publication, including
 
 Use standard comma-delimited CSV quoting with strict parsing. An empty file fails; a valid header with no data produces only the report header. Blank, short, and long records fail. Do not sniff dialects or remove a BOM. Exactly one path is required; command misuse exits 2 with usage on stderr.
 
+## Multi-file library API
+
+Import `aggregate_csv_files` from `invoice_totals.batch`. Pass an iterable of string paths or path-like objects returning strings. The function reads UTF-8 files in caller order under the same invoice rules and returns a fresh `dict[tuple[str, str], int]`: exact original customer/currency pairs map to Python integer cents. Sorted key insertion makes iteration deterministic. Negative credits offset positive invoices, currencies remain separate, and zero-total groups remain.
+
+Invoice IDs must be globally unique across every file, including a repeated path. A duplicate invalidates the call and identifies both the current and first source/physical record-start line, even for multiline records. Return the mapping only after all files validate and close; no successful partial mapping escapes. Empty iterables and any set of valid header-only files return `{}`; an empty file remains invalid. Calls share no mutable state.
+
+The library prints nothing and writes no output files. Expected invoice, CSV, UTF-8 and open/read/close errors raise `InvoiceInputError` from `invoice_totals.report`, retaining wrapped causes and concise source/available-position/field/reason diagnostics. Embedded-NUL paths are file errors. Bare string/path-like collections, bytes paths and invalid argument types raise `TypeError`; iterator and path-conversion errors propagate without reclassification. The one-file CLI and its CSV success/error/usage behavior remain unchanged.
+
 ## Acceptance and constraints
 
 `python3 -m invoice_totals sample_invoices.csv` must yield exactly:
@@ -28,4 +36,6 @@ Example Bakery,USD,0.25
 Example Studio,EUR,8.40
 ```
 
-Keep Python 3.12+, the standard library, and offline operation. Do not normalize names, infer/convert currencies, add persistence, flags, dependencies, or extra output modes. Full verification is `python3 -m unittest discover -s tests -v`; tests cover process output, validation, precision, quoting, positions and input lifecycle failures. [README.md](../README.md) describes practical redirection, including preserving an earlier report on failure. [The design record](specs/2026-10-04-invoice-totals.md) contains the settled decisions.
+The singleton library call `aggregate_csv_files(["sample_invoices.csv"])` must return `{("Example Bakery", "USD"): 25, ("Example Studio", "EUR"): 840}` without output.
+
+Keep Python 3.12+, the standard library, and offline operation. Do not normalize names, infer/convert currencies, add persistence, flags, dependencies, or extra command output modes. Full verification is `python3 -m unittest discover -s tests -v`; tests cover process output, validation, precision, quoting, positions, batch uniqueness/atomicity and input lifecycle failures. [README.md](../README.md) describes practical redirection, including preserving an earlier report on failure. The [CLI design record](specs/2026-10-04-invoice-totals.md) and [batch API design](specs/2026-10-04-batch-api.md) contain the settled decisions.

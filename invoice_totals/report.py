@@ -28,11 +28,16 @@ def _format_cents(cents: int) -> str:
     return f"{sign}{whole}.{fraction:02d}"
 
 
-def prepare_report(stream: TextIO, source: str) -> str:
-    """Read and validate every record before returning any report text."""
+def _accumulate_invoices(
+    stream: TextIO,
+    source: str,
+    totals: dict[tuple[str, str], int],
+    invoice_locations: dict[str, tuple[str, int]],
+    *,
+    include_first_source: bool = False,
+) -> None:
+    """Validate one stream and accumulate into caller-owned private state."""
     reader = csv.reader(stream, strict=True)
-    totals: dict[tuple[str, str], int] = {}
-    invoice_lines: dict[str, int] = {}
 
     def invalid(line: int, field: str, reason: str) -> InvoiceInputError:
         return InvoiceInputError(f"{source}: line {line}: {field}: {reason}")
@@ -58,12 +63,17 @@ def prepare_report(stream: TextIO, source: str) -> str:
                     raise invalid(line, field, "must not be blank or whitespace-only")
 
             invoice_id = row[positions["invoice_id"]]
-            if invoice_id in invoice_lines:
+            if invoice_id in invoice_locations:
+                first_source, first_line = invoice_locations[invoice_id]
+                first_location = (
+                    f"{first_source}: line {first_line}" if include_first_source
+                    else f"line {first_line}"
+                )
                 raise invalid(
                     line, "invoice_id",
-                    f"duplicate {invoice_id!r}; first occurrence at line {invoice_lines[invoice_id]}",
+                    f"duplicate {invoice_id!r}; first occurrence at {first_location}",
                 )
-            invoice_lines[invoice_id] = line
+            invoice_locations[invoice_id] = (source, line)
             try:
                 amount = parse_amount(row[positions["amount"]])
             except ValueError as error:
@@ -72,6 +82,12 @@ def prepare_report(stream: TextIO, source: str) -> str:
             totals[group] = totals.get(group, 0) + _integer_cents(amount)
     except csv.Error as error:
         raise invalid(max(reader.line_num, 1), "CSV", str(error)) from error
+
+
+def prepare_report(stream: TextIO, source: str) -> str:
+    """Read and validate every record before returning any report text."""
+    totals: dict[tuple[str, str], int] = {}
+    _accumulate_invoices(stream, source, totals, {})
 
     output = io.StringIO(newline="")
     writer = csv.writer(output, lineterminator="\n")
