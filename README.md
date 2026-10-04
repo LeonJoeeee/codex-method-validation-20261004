@@ -46,3 +46,33 @@ python3 -m invoice_totals sample_invoices.csv > totals.new.csv && mv totals.new.
 ```
 
 Use an output path different from the input CSV. See [the requirements](docs/PRD.md), [architecture](docs/architecture.md), and [design record](docs/specs/2026-10-04-invoice-totals.md).
+
+## Library usage
+
+The two independent library APIs exchange mappings of exact `(customer, currency)` strings to Python integer cents. They preserve original spelling and whitespace, keep currencies separate, and retain negative and zero totals.
+
+For already-computed totals, use the JSON serializer directly:
+
+```python
+from invoice_totals.json_output import totals_to_json
+
+text = totals_to_json({("示例客户", "CNY"): 125})
+# '[{"customer":"示例客户","currency":"CNY","total":"1.25"}]'
+```
+
+`totals_to_json(totals)` accepts a mapping with two-string tuple keys and values of exact type `int`. It rejects booleans, integer subclasses, floats, Decimal values, and coercible strings with `TypeError`; invalid mapping/key types or shapes also raise `TypeError`. Blank or whitespace-only customer/currency strings raise `ValueError`. No coercion or rounding occurs.
+
+The returned JSON is compact, without a trailing newline, and sorted by original customer then currency. Each object has `customer`, `currency`, and `total` fields in that order. Amounts are exact two-place strings, including `"-0.01"` and `"0.00"`, with no integer magnitude limit imposed by this API. Unicode stays visible and quotes/control characters are escaped. An empty mapping returns exactly `"[]"`. The function does not mutate its input, read files, or publish output.
+
+To aggregate multiple CSV files, then serialize the result:
+
+```python
+from invoice_totals.batch import aggregate_csv_files
+from invoice_totals.json_output import totals_to_json
+
+totals = aggregate_csv_files(["sample_invoices.csv"])
+text = totals_to_json(totals)
+# '[{"customer":"Example Bakery","currency":"USD","total":"0.25"},{"customer":"Example Studio","currency":"EUR","total":"8.40"}]'
+```
+
+`aggregate_csv_files(paths)` returns integer-cent totals for the supplied CSV paths; an empty iterable returns `{}`. The JSON API also works with precomputed mappings from other sources and does not import or execute the batch API. These library calls add no command flags or CLI output modes.
