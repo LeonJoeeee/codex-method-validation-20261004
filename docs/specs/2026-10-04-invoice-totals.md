@@ -1,5 +1,7 @@
 # Invoice CSV totals design
 
+Status: draft
+
 ## Purpose and scope
 
 The accounts team needs an offline command that replaces weekly manual invoice addition with a CSV totals report. The synthetic `sample_invoices.csv` is the acceptance fixture. The confirmed issue contract is authoritative; this spec records its design and routine edge-case decisions for independent challenge before implementation.
