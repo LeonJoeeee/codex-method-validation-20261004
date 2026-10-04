@@ -1,6 +1,6 @@
 # Invoice CSV totals design
 
-Status: draft
+Status: accepted
 
 ## Purpose and scope
 
