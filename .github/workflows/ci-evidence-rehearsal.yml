@@ -54,7 +54,7 @@ jobs:
                           protocol_sha256='e3b2ebc92f3cbaedf0feed985e3d9d7bd1f9d4f990cb22a8eacf5c55a33fc6b7',
                           inner_repo='LeonJoeeee/codex-method', inner_pr=19,
                           inner_base='1a9e1d386313cf784559ee0dda54723e4b88f129',
-                          inner_head='389d00b18662de6dd39c3bb844c01a58335f85f5')
+                          inner_head='c76996fa01b819d2e2c97ef21f6dd36fa99978b1')
           (outer / 'outer-identity.json').write_text(json.dumps(identity, indent=2) + '\n')
           PY
       - name: Checkout reviewed outer PR head
@@ -67,7 +67,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: LeonJoeeee/codex-method
-          ref: 389d00b18662de6dd39c3bb844c01a58335f85f5
+          ref: c76996fa01b819d2e2c97ef21f6dd36fa99978b1
           path: product-source
           fetch-depth: 0
           persist-credentials: false
@@ -103,13 +103,13 @@ jobs:
           def api(name, endpoint, paginate=False):
               args = ['gh', 'api'] + (['--paginate', '--slurp'] if paginate else [])
               return json.loads(command(name, args + [endpoint]))
-          pins = {'scripts/ci-evidence': '73b7d6534f806b1e3a2e0e1762499ad20421c3a4964d2028b5003c4bcfc0d286',
+          pins = {'scripts/ci-evidence': '5fc6f77442b215338500adade1c5ed1a708e2fe478699a0967d124bb64eec68c',
                   'scripts/ci-evidence-map.json': '0d6553a1d1e601fe9b602879596747566f9408ae51f06595b80f3b40b5ff5507'}
           for name, expected in pins.items():
               if hashlib.sha256((product / name).read_bytes()).hexdigest() != expected:
                   raise SystemExit('Inner collector/map pin mismatch')
           checkout = command('inner-checkout', ['git', 'rev-parse', 'HEAD']).decode().strip()
-          if checkout != '389d00b18662de6dd39c3bb844c01a58335f85f5':
+          if checkout != 'c76996fa01b819d2e2c97ef21f6dd36fa99978b1':
               raise SystemExit('Inner checkout moved')
           if command('inner-clean', ['git', 'status', '--porcelain', '-uall']):
               raise SystemExit('Inner source is dirty')
@@ -203,7 +203,7 @@ jobs:
               report = json.loads(manifest.read_text())
               identity = report.get('identity', {})
               result['inner_identity'] = identity
-              if report.get('simulated') is not True or report.get('merge_permitted') is not False or identity.get('base') != '1a9e1d386313cf784559ee0dda54723e4b88f129' or identity.get('head') != '389d00b18662de6dd39c3bb844c01a58335f85f5':
+              if report.get('simulated') is not True or report.get('merge_permitted') is not False or identity.get('base') != '1a9e1d386313cf784559ee0dda54723e4b88f129' or identity.get('head') != 'c76996fa01b819d2e2c97ef21f6dd36fa99978b1':
                   result['fixed_pin_refusal'] = 'No qualifying fixed-pin result; preserve whole partial evidence.'
                   code = code or 1
           result['exit_code'] = code
@@ -249,7 +249,7 @@ jobs:
           if 'inner-pr-after' in responses and 'inner-base-after' in responses:
               pull = responses['inner-pr-after'][0]
               ref = responses['inner-base-after'][0]
-              if pull['state'] != 'open' or pull['base']['ref'] != 'main' or pull['head']['sha'] != '389d00b18662de6dd39c3bb844c01a58335f85f5' or pull['base']['sha'] != '1a9e1d386313cf784559ee0dda54723e4b88f129' or ref['object']['sha'] != pull['base']['sha']:
+              if pull['state'] != 'open' or pull['base']['ref'] != 'main' or pull['head']['sha'] != 'c76996fa01b819d2e2c97ef21f6dd36fa99978b1' or pull['base']['sha'] != '1a9e1d386313cf784559ee0dda54723e4b88f129' or ref['object']['sha'] != pull['base']['sha']:
                   failure = True
           (outer / 'post-identity-result.json').write_text(json.dumps(dict(
               simulated=True, merge_permitted=False, fixed_identity_verified=not failure,
