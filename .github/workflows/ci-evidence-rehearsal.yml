@@ -1,0 +1,272 @@
+name: SIMULATED CI evidence rehearsal - integration blocked
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - .github/workflows/ci-evidence-rehearsal.yml
+      - rehearsal-inputs/ci-evidence/**
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  simulated-evidence:
+    # Root alone marks this reviewed dedicated PR ready. Draft opens never collect.
+    if: >-
+      github.event.action == 'ready_for_review' &&
+      github.actor == 'LeonJoeeee' &&
+      github.event.sender.login == 'LeonJoeeee' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login == 'LeonJoeeee' &&
+      github.event.pull_request.head.repo.full_name == 'LeonJoeeee/codex-method-validation-20261004' &&
+      github.event.pull_request.head.ref == 'task/10-prepare-isolated-linux-ci-evidence-rehearsal-orc' &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Capture outer event before checkout - SIMULATED exercise
+        env:
+          OUTER_ROOT: ${{ runner.temp }}/simulated-outer-evidence
+          INNER_OUTPUT: ${{ runner.temp }}/simulated-issue17-evidence
+          OUTER_WORKFLOW_REF: ${{ github.workflow_ref }}
+          OUTER_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          OUTER_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          OUTER_PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, shutil
+          from datetime import datetime, timezone
+          from pathlib import Path
+          outer = Path(os.environ['OUTER_ROOT'])
+          outer.mkdir()
+          shutil.copyfile(os.environ['GITHUB_EVENT_PATH'], outer / 'outer-event.json')
+          keys = ('GITHUB_REPOSITORY', 'GITHUB_EVENT_NAME', 'GITHUB_RUN_ID',
+                  'GITHUB_RUN_ATTEMPT', 'GITHUB_JOB', 'GITHUB_SHA', 'GITHUB_REF',
+                  'GITHUB_WORKFLOW', 'GITHUB_ACTOR', 'OUTER_WORKFLOW_REF',
+                  'OUTER_WORKFLOW_SHA', 'OUTER_PR_HEAD', 'OUTER_PR_BASE')
+          identity = {key: os.environ[key] for key in keys}
+          identity.update(simulated=True, merge_permitted=False,
+                          captured_at=datetime.now(timezone.utc).isoformat(),
+                          meaning='Outer fixture infrastructure only; every derived rehearsal result is simulated. Integration blocked.',
+                          protocol_sha256='e3b2ebc92f3cbaedf0feed985e3d9d7bd1f9d4f990cb22a8eacf5c55a33fc6b7',
+                          inner_repo='LeonJoeeee/codex-method', inner_pr=19,
+                          inner_base='1a9e1d386313cf784559ee0dda54723e4b88f129',
+                          inner_head='c76996fa01b819d2e2c97ef21f6dd36fa99978b1')
+          (outer / 'outer-identity.json').write_text(json.dumps(identity, indent=2) + '\n')
+          PY
+      - name: Checkout reviewed outer PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: fixture-source
+          persist-credentials: false
+      - name: Checkout immutable public inner collector
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: LeonJoeeee/codex-method
+          ref: c76996fa01b819d2e2c97ef21f6dd36fa99978b1
+          path: product-source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Capture fresh public context and generate SIMULATED proof
+        env:
+          OUTER_ROOT: ${{ runner.temp }}/simulated-outer-evidence
+          INNER_OUTPUT: ${{ runner.temp }}/simulated-issue17-evidence
+          GH_TOKEN: ${{ github.token }}
+          GH_CONFIG_DIR: ${{ runner.temp }}/read-only-gh-config
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, shutil, subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+          outer = Path(os.environ['OUTER_ROOT'])
+          workspace = Path(os.environ['GITHUB_WORKSPACE'])
+          product = workspace / 'product-source'
+          fixture = workspace / 'fixture-source'
+          def utc():
+              return datetime.now(timezone.utc).isoformat()
+          def command(name, argv, cwd=product):
+              intent = dict(simulated=True, merge_permitted=False, argv=argv,
+                            cwd=str(cwd), started_at=utc())
+              (outer / (name + '-started.json')).write_text(json.dumps(intent, indent=2) + '\n')
+              result = subprocess.run(argv, cwd=cwd, capture_output=True)
+              record = dict(intent, completed_at=utc(), exit_code=result.returncode,
+                            stdout_b64=base64.b64encode(result.stdout).decode(),
+                            stderr_b64=base64.b64encode(result.stderr).decode())
+              (outer / (name + '-result.json')).write_text(json.dumps(record, indent=2) + '\n')
+              if result.returncode:
+                  raise SystemExit(result.returncode)
+              return result.stdout
+          def api(name, endpoint, paginate=False):
+              args = ['gh', 'api'] + (['--paginate', '--slurp'] if paginate else [])
+              return json.loads(command(name, args + [endpoint]))
+          pins = {'scripts/ci-evidence': '5fc6f77442b215338500adade1c5ed1a708e2fe478699a0967d124bb64eec68c',
+                  'scripts/ci-evidence-map.json': '0d6553a1d1e601fe9b602879596747566f9408ae51f06595b80f3b40b5ff5507'}
+          for name, expected in pins.items():
+              if hashlib.sha256((product / name).read_bytes()).hexdigest() != expected:
+                  raise SystemExit('Inner collector/map pin mismatch')
+          checkout = command('inner-checkout', ['git', 'rev-parse', 'HEAD']).decode().strip()
+          if checkout != 'c76996fa01b819d2e2c97ef21f6dd36fa99978b1':
+              raise SystemExit('Inner checkout moved')
+          if command('inner-clean', ['git', 'status', '--porcelain', '-uall']):
+              raise SystemExit('Inner source is dirty')
+          fixture_head = command('outer-checkout', ['git', 'rev-parse', 'HEAD', 'HEAD^{tree}'], fixture).decode().splitlines()
+          if fixture_head[0] != json.loads((outer / 'outer-identity.json').read_text())['OUTER_PR_HEAD']:
+              raise SystemExit('Reviewed outer checkout differs from event head')
+          if command('outer-clean', ['git', 'status', '--porcelain', '-uall'], fixture):
+              raise SystemExit('Outer source is dirty')
+          workflow = '.github/workflows/ci-evidence-rehearsal.yml'
+          shutil.copyfile(fixture / workflow, outer / 'outer-workflow.yml')
+          template_root = fixture / 'rehearsal-inputs/ci-evidence'
+          template_pins = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                           for p in sorted(template_root.iterdir()) if p.is_file()}
+          (outer / 'reviewed-input-pins.json').write_text(json.dumps(dict(
+              simulated=True, merge_permitted=False, collector=pins, templates=template_pins,
+              outer_workflow_sha256=hashlib.sha256((fixture / workflow).read_bytes()).hexdigest()), indent=2) + '\n')
+          repo = api('inner-repository', 'repos/LeonJoeeee/codex-method')
+          pull = api('inner-pr-before', 'repos/LeonJoeeee/codex-method/pulls/19')
+          ref = api('inner-base-before', 'repos/LeonJoeeee/codex-method/git/ref/heads/main')
+          if repo['private'] or repo['default_branch'] != 'main' or pull['state'] != 'open' or pull['base']['ref'] != 'main' or pull['base']['sha'] != '1a9e1d386313cf784559ee0dda54723e4b88f129' or ref['object']['sha'] != pull['base']['sha'] or pull['head']['sha'] != checkout:
+              raise SystemExit('Fixed public inner identity changed; root must review a new run')
+          issue = api('issue17', 'repos/LeonJoeeee/codex-method/issues/17')
+          pages = api('issue17-comments', 'repos/LeonJoeeee/codex-method/issues/17/comments?per_page=100', True)
+          comments = [comment for page in pages for comment in page]
+          context = outer / 'context'
+          context.mkdir()
+          (context / 'issue.json').write_text(json.dumps(dict(simulated=True,
+              merge_permitted=False, captured_at=utc(), issue=issue, comments=comments,
+              context_scope='Fresh public whole ordered issue and comments; observed records are not outage proof.'), indent=2) + '\n')
+          spec = api('accepted-spec-blob', 'repos/LeonJoeeee/codex-method/git/blobs/2d2e4521c0f9db7d029f88ca8c0a44d2132b414e')
+          raw = base64.b64decode(spec['content'])
+          if spec['encoding'] != 'base64' or spec['sha'] != '2d2e4521c0f9db7d029f88ca8c0a44d2132b414e' or hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest() != spec['sha']:
+              raise SystemExit('Accepted spec blob mismatch')
+          (context / 'accepted-spec.md').write_bytes(raw)
+          shutil.copyfile(template_root / 'source-checklist.md', context / 'source-checklist.md')
+          api('public-workflows', 'repos/LeonJoeeee/codex-method/actions/workflows?per_page=100', True)
+          api('public-runs', 'repos/LeonJoeeee/codex-method/actions/runs?event=pull_request&head_sha=' + checkout + '&per_page=100', True)
+          # Original public API results above establish readability/config observations.
+          # The following provider response and diagnostic claims are ALL synthetic.
+          proof = json.loads((template_root / 'proof-template.json').read_text())
+          now = utc()
+          proof['observed_at'] = now
+          proof['captures'][0]['captured_at'] = now
+          proof['captures'][0]['stdout'] = json.dumps(dict(simulated=True, incidents=[dict(
+              simulated=True, id='SIMULATED-ISSUE17-QUALIFICATION-' + os.environ['GITHUB_RUN_ID'] + '-' + os.environ['GITHUB_RUN_ATTEMPT'],
+              status='investigating', name='SIMULATED Actions provider outage; integration blocked',
+              components=[dict(name='Actions', status='major_outage')])]))
+          (outer / 'proof.json').write_text(json.dumps(proof, indent=2) + '\n')
+          PY
+      - name: Run pinned collector - SIMULATED, integration blocked
+        env:
+          OUTER_ROOT: ${{ runner.temp }}/simulated-outer-evidence
+          INNER_OUTPUT: ${{ runner.temp }}/simulated-issue17-evidence
+          GH_TOKEN: ${{ github.token }}
+          GH_CONFIG_DIR: ${{ runner.temp }}/read-only-gh-config
+        run: |
+          python3 - <<'PY'
+          import json, os, signal, subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+          outer = Path(os.environ['OUTER_ROOT'])
+          product = Path(os.environ['GITHUB_WORKSPACE']) / 'product-source'
+          argv = ['scripts/ci-evidence', '--project', str(product),
+                  '--repo', 'LeonJoeeee/codex-method', '--pr', '19',
+                  '--proof', str(outer / 'proof.json'), '--context', str(outer / 'context'),
+                  '--map', str(product / 'scripts/ci-evidence-map.json'),
+                  '--output', os.environ['INNER_OUTPUT'], '--rehearsal']
+          intent = dict(simulated=True, merge_permitted=False, argv=argv, cwd=str(product),
+                        started_at=datetime.now(timezone.utc).isoformat(),
+                        token_policy='Read-only token in collector parent for public API calls; mapped job environments exclude it.')
+          (outer / 'collector-started.json').write_text(json.dumps(intent, indent=2) + '\n')
+          # Whole stdout/stderr go directly to files and survive a timeout/failed run.
+          with (outer / 'collector.stdout').open('wb') as stdout, (outer / 'collector.stderr').open('wb') as stderr:
+              child = subprocess.Popen(argv, cwd=product, stdout=stdout, stderr=stderr, start_new_session=True)
+              timed_out = False
+              try:
+                  code = child.wait(timeout=1200)
+              except subprocess.TimeoutExpired:
+                  timed_out = True
+                  os.killpg(child.pid, signal.SIGTERM)
+                  try:
+                      child.wait(timeout=30)
+                  except subprocess.TimeoutExpired:
+                      os.killpg(child.pid, signal.SIGKILL)
+                      child.wait()
+                  code = 124
+          result = dict(intent, exit_code=code, timed_out=timed_out,
+                        completed_at=datetime.now(timezone.utc).isoformat())
+          manifest = Path(os.environ['INNER_OUTPUT']) / 'manifest.json'
+          if manifest.exists():
+              report = json.loads(manifest.read_text())
+              identity = report.get('identity', {})
+              result['inner_identity'] = identity
+              if report.get('simulated') is not True or report.get('merge_permitted') is not False or identity.get('base') != '1a9e1d386313cf784559ee0dda54723e4b88f129' or identity.get('head') != 'c76996fa01b819d2e2c97ef21f6dd36fa99978b1':
+                  result['fixed_pin_refusal'] = 'No qualifying fixed-pin result; preserve whole partial evidence.'
+                  code = code or 1
+          result['exit_code'] = code
+          (outer / 'collector-result.json').write_text(json.dumps(result, indent=2) + '\n')
+          raise SystemExit(code)
+          PY
+      - name: Always capture outer run jobs and fixed inner identities after collection
+        if: always()
+        env:
+          OUTER_ROOT: ${{ runner.temp }}/simulated-outer-evidence
+          INNER_OUTPUT: ${{ runner.temp }}/simulated-issue17-evidence
+          GH_TOKEN: ${{ github.token }}
+          GH_CONFIG_DIR: ${{ runner.temp }}/read-only-gh-config
+        run: |
+          python3 - <<'PYCODE'
+          import base64, json, os, subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+          outer = Path(os.environ['OUTER_ROOT'])
+          outer.mkdir(exist_ok=True)
+          failure = False
+          responses = {}
+          endpoints = {
+              'outer-run': 'repos/' + os.environ['GITHUB_REPOSITORY'] + '/actions/runs/' + os.environ['GITHUB_RUN_ID'],
+              'outer-jobs': 'repos/' + os.environ['GITHUB_REPOSITORY'] + '/actions/runs/' + os.environ['GITHUB_RUN_ID'] + '/attempts/' + os.environ['GITHUB_RUN_ATTEMPT'] + '/jobs?per_page=100',
+              'inner-pr-after': 'repos/LeonJoeeee/codex-method/pulls/19',
+              'inner-base-after': 'repos/LeonJoeeee/codex-method/git/ref/heads/main'}
+          for name, endpoint in endpoints.items():
+              argv = ['gh', 'api', '--paginate', '--slurp', endpoint]
+              intent = dict(simulated=True, merge_permitted=False, argv=argv,
+                            cwd=str(Path.cwd()), started_at=datetime.now(timezone.utc).isoformat())
+              (outer / (name + '-started.json')).write_text(json.dumps(intent, indent=2) + '\n')
+              proc = subprocess.run(argv, capture_output=True)
+              record = dict(intent, exit_code=proc.returncode,
+                            completed_at=datetime.now(timezone.utc).isoformat(),
+                            stdout_b64=base64.b64encode(proc.stdout).decode(),
+                            stderr_b64=base64.b64encode(proc.stderr).decode())
+              (outer / (name + '-result.json')).write_text(json.dumps(record, indent=2) + '\n')
+              if proc.returncode:
+                  failure = True
+              else:
+                  responses[name] = json.loads(proc.stdout)
+          if 'inner-pr-after' in responses and 'inner-base-after' in responses:
+              pull = responses['inner-pr-after'][0]
+              ref = responses['inner-base-after'][0]
+              if pull['state'] != 'open' or pull['base']['ref'] != 'main' or pull['head']['sha'] != 'c76996fa01b819d2e2c97ef21f6dd36fa99978b1' or pull['base']['sha'] != '1a9e1d386313cf784559ee0dda54723e4b88f129' or ref['object']['sha'] != pull['base']['sha']:
+                  failure = True
+          (outer / 'post-identity-result.json').write_text(json.dumps(dict(
+              simulated=True, merge_permitted=False, fixed_identity_verified=not failure,
+              note='Final completed outer check conclusions must be downloaded separately by root.'), indent=2) + '\n')
+          raise SystemExit(1 if failure else 0)
+          PYCODE
+      - name: Always retain whole SIMULATED evidence and failed partial output
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: SIMULATED-integration-blocked-issue17-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/simulated-outer-evidence/
+            ${{ runner.temp }}/simulated-issue17-evidence/
+            !${{ runner.temp }}/simulated-issue17-evidence/checkout/**
+            !${{ runner.temp }}/simulated-issue17-evidence/job-home/**
