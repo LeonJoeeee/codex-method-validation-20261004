@@ -1,0 +1,32 @@
+{
+  "simulated": true,
+  "merge_permitted": false,
+  "cause": "provider-outage",
+  "scope": "SIMULATED qualification exercise: all otherwise eligible GitHub Actions pushes in the hypothetical provider scope",
+  "why_waiting_ruled_out": "SIMULATED qualification exercise only; no real incident and no actual decision that waiting is impossible. Integration remains blocked.",
+  "external_to_repo": true,
+  "prevents_all_eligible_pushes": true,
+  "observed_at": "RUNTIME_UTC",
+  "diagnostics": {
+    "simulated": true,
+    "authenticated": true,
+    "readable": true,
+    "workflow_enabled": true,
+    "event_eligible": true,
+    "org_enabled": true,
+    "runs": []
+  },
+  "captures": [
+    {
+      "simulated": true,
+      "argv": [
+        "SIMULATED response for curl",
+        "https://www.githubstatus.com/api/v2/incidents/unresolved.json"
+      ],
+      "exit_code": 0,
+      "captured_at": "RUNTIME_UTC",
+      "stdout": "RUNTIME_SIMULATED_INCIDENT_JSON",
+      "stderr": ""
+    }
+  ]
+}
